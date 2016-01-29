@@ -5,7 +5,6 @@ goog.require('goog.events.EventTarget');
 goog.require('goog.events.EventType');
 
 
-
 /**
  * @classdesc
  * Abstract base class; normally only used for creating subclasses and not
@@ -59,6 +58,18 @@ ol.Observable.prototype.changed = function() {
  * @event change
  * @api
  */
+
+
+/**
+ * Dispatches an event and calls all listeners listening for events
+ * of this type. The event parameter can either be a string or an
+ * Object with a `type` property.
+ *
+ * @param {goog.events.EventLike} event Event object.
+ * @function
+ * @api
+ */
+ol.Observable.prototype.dispatchEvent;
 
 
 /**

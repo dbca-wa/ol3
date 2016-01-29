@@ -2,10 +2,10 @@ goog.provide('ol.DeviceOrientation');
 goog.provide('ol.DeviceOrientationProperty');
 
 goog.require('goog.events');
-goog.require('goog.math');
 goog.require('ol');
 goog.require('ol.Object');
 goog.require('ol.has');
+goog.require('ol.math');
 
 
 /**
@@ -18,7 +18,6 @@ ol.DeviceOrientationProperty = {
   HEADING: 'heading',
   TRACKING: 'tracking'
 };
-
 
 
 /**
@@ -66,10 +65,10 @@ ol.DeviceOrientationProperty = {
  * equivalent properties in ol.DeviceOrientation are in radians for consistency
  * with all other uses of angles throughout OpenLayers.
  *
- * @see http://www.w3.org/TR/orientation-event/
- *
  * To get notified of device orientation changes, register a listener for the
  * generic `change` event on your `ol.DeviceOrientation` instance.
+ *
+ * @see {@link http://www.w3.org/TR/orientation-event/}
  *
  * @constructor
  * @extends {ol.Object}
@@ -115,24 +114,24 @@ ol.DeviceOrientation.prototype.orientationChange_ = function(browserEvent) {
   var event = /** @type {DeviceOrientationEvent} */
       (browserEvent.getBrowserEvent());
   if (event.alpha !== null) {
-    var alpha = goog.math.toRadians(event.alpha);
+    var alpha = ol.math.toRadians(event.alpha);
     this.set(ol.DeviceOrientationProperty.ALPHA, alpha);
     // event.absolute is undefined in iOS.
     if (goog.isBoolean(event.absolute) && event.absolute) {
       this.set(ol.DeviceOrientationProperty.HEADING, alpha);
     } else if (goog.isNumber(event.webkitCompassHeading) &&
                event.webkitCompassAccuracy != -1) {
-      var heading = goog.math.toRadians(event.webkitCompassHeading);
+      var heading = ol.math.toRadians(event.webkitCompassHeading);
       this.set(ol.DeviceOrientationProperty.HEADING, heading);
     }
   }
   if (event.beta !== null) {
     this.set(ol.DeviceOrientationProperty.BETA,
-        goog.math.toRadians(event.beta));
+        ol.math.toRadians(event.beta));
   }
   if (event.gamma !== null) {
     this.set(ol.DeviceOrientationProperty.GAMMA,
-        goog.math.toRadians(event.gamma));
+        ol.math.toRadians(event.gamma));
   }
   this.changed();
 };

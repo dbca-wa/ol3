@@ -7,7 +7,6 @@ goog.require('ol.events.condition');
 goog.require('ol.interaction.Interaction');
 
 
-
 /**
  * @classdesc
  * Allows the user to zoom the map using keyboard + and -.
@@ -50,7 +49,7 @@ ol.interaction.KeyboardZoom = function(opt_options) {
    * @private
    * @type {number}
    */
-  this.duration_ = options.duration ? options.duration : 100;
+  this.duration_ = options.duration !== undefined ? options.duration : 100;
 
 };
 goog.inherits(ol.interaction.KeyboardZoom, ol.interaction.Interaction);

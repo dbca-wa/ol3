@@ -4,7 +4,6 @@ goog.provide('ol.OverlayProperty');
 
 goog.require('goog.asserts');
 goog.require('goog.dom');
-goog.require('goog.dom.TagName');
 goog.require('goog.events');
 goog.require('goog.style');
 goog.require('ol.Coordinate');
@@ -48,7 +47,6 @@ ol.OverlayPositioning = {
 };
 
 
-
 /**
  * @classdesc
  * An element to be displayed over the map and attached to a single map
@@ -76,6 +74,12 @@ ol.Overlay = function(options) {
 
   /**
    * @private
+   * @type {number|string|undefined}
+   */
+  this.id_ = options.id;
+
+  /**
+   * @private
    * @type {boolean}
    */
   this.insertFirst_ = options.insertFirst !== undefined ?
@@ -91,9 +95,8 @@ ol.Overlay = function(options) {
    * @private
    * @type {Element}
    */
-  this.element_ = goog.dom.createDom(goog.dom.TagName.DIV, {
-    'class': 'ol-overlay-container'
-  });
+  this.element_ = document.createElement('DIV');
+  this.element_.className = 'ol-overlay-container';
   this.element_.style.position = 'absolute';
 
   /**
@@ -189,6 +192,16 @@ ol.Overlay.prototype.getElement = function() {
 
 
 /**
+ * Get the overlay identifier which is set on constructor.
+ * @return {number|string|undefined} Id.
+ * @api
+ */
+ol.Overlay.prototype.getId = function() {
+  return this.id_;
+};
+
+
+/**
  * Get the map associated with this overlay.
  * @return {ol.Map|undefined} The map that the overlay is part of.
  * @observable
@@ -245,7 +258,7 @@ ol.Overlay.prototype.handleElementChanged = function() {
   goog.dom.removeChildren(this.element_);
   var element = this.getElement();
   if (element) {
-    goog.dom.append(/** @type {!Node} */ (this.element_), element);
+    this.element_.appendChild(element);
   }
 };
 
@@ -270,7 +283,7 @@ ol.Overlay.prototype.handleMapChanged = function() {
       goog.dom.insertChildAt(/** @type {!Element} */ (
           container), this.element_, 0);
     } else {
-      goog.dom.append(/** @type {!Node} */ (container), this.element_);
+      container.appendChild(this.element_);
     }
   }
 };
@@ -423,7 +436,7 @@ ol.Overlay.prototype.panIntoView_ = function() {
  * Get the extent of an element relative to the document
  * @param {Element|undefined} element The element.
  * @param {ol.Size|undefined} size The size of the element.
- * @return {ol.Extent}
+ * @return {ol.Extent} The extent.
  * @private
  */
 ol.Overlay.prototype.getRect_ = function(element, size) {
@@ -454,7 +467,7 @@ ol.Overlay.prototype.setPositioning = function(positioning) {
 
 /**
  * Modify the visibility of the element.
- * @param {boolean} visible
+ * @param {boolean} visible Element visibility.
  * @protected
  */
 ol.Overlay.prototype.setVisible = function(visible) {
@@ -484,8 +497,8 @@ ol.Overlay.prototype.updatePixelPosition = function() {
 
 
 /**
- * @param {ol.Pixel} pixel
- * @param {ol.Size|undefined} mapSize
+ * @param {ol.Pixel} pixel The pixel location.
+ * @param {ol.Size|undefined} mapSize The map size.
  * @protected
  */
 ol.Overlay.prototype.updateRenderedPosition = function(pixel, mapSize) {

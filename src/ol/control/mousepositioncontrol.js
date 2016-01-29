@@ -3,7 +3,6 @@
 goog.provide('ol.control.MousePosition');
 
 goog.require('goog.dom');
-goog.require('goog.dom.TagName');
 goog.require('goog.events');
 goog.require('goog.events.EventType');
 goog.require('ol.CoordinateFormatType');
@@ -22,7 +21,6 @@ ol.control.MousePositionProperty = {
   PROJECTION: 'projection',
   COORDINATE_FORMAT: 'coordinateFormat'
 };
-
 
 
 /**
@@ -44,7 +42,7 @@ ol.control.MousePosition = function(opt_options) {
 
   var className = options.className ? options.className : 'ol-mouse-position';
 
-  var element = goog.dom.createDom(goog.dom.TagName.DIV, className);
+  var element = goog.dom.createDom('DIV', className);
 
   var render = options.render ?
       options.render : ol.control.MousePosition.render;

@@ -5,12 +5,12 @@ goog.provide('ol.GeolocationProperty');
 
 goog.require('goog.events');
 goog.require('goog.events.EventType');
-goog.require('goog.math');
 goog.require('ol.Coordinate');
 goog.require('ol.Object');
 goog.require('ol.geom.Geometry');
 goog.require('ol.geom.Polygon');
 goog.require('ol.has');
+goog.require('ol.math');
 goog.require('ol.proj');
 goog.require('ol.sphere.WGS84');
 
@@ -30,7 +30,6 @@ ol.GeolocationProperty = {
   TRACKING: 'tracking',
   TRACKING_OPTIONS: 'trackingOptions'
 };
-
 
 
 /**
@@ -136,8 +135,8 @@ ol.Geolocation.prototype.handleTrackingChanged_ = function() {
     var tracking = this.getTracking();
     if (tracking && this.watchId_ === undefined) {
       this.watchId_ = goog.global.navigator.geolocation.watchPosition(
-          goog.bind(this.positionChange_, this),
-          goog.bind(this.positionError_, this),
+          this.positionChange_.bind(this),
+          this.positionError_.bind(this),
           this.getTrackingOptions());
     } else if (!tracking && this.watchId_ !== undefined) {
       goog.global.navigator.geolocation.clearWatch(this.watchId_);
@@ -160,7 +159,7 @@ ol.Geolocation.prototype.positionChange_ = function(position) {
       coords.altitudeAccuracy === null ?
       undefined : coords.altitudeAccuracy);
   this.set(ol.GeolocationProperty.HEADING, coords.heading === null ?
-      undefined : goog.math.toRadians(coords.heading));
+      undefined : ol.math.toRadians(coords.heading));
   if (!this.position_) {
     this.position_ = [coords.longitude, coords.latitude];
   } else {

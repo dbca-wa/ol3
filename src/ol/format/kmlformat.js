@@ -10,7 +10,7 @@ goog.require('goog.Uri');
 goog.require('goog.array');
 goog.require('goog.asserts');
 goog.require('goog.dom.NodeType');
-goog.require('goog.math');
+goog.require('goog.object');
 goog.require('ol');
 goog.require('ol.Feature');
 goog.require('ol.FeatureStyleFunction');
@@ -30,6 +30,7 @@ goog.require('ol.geom.MultiPoint');
 goog.require('ol.geom.MultiPolygon');
 goog.require('ol.geom.Point');
 goog.require('ol.geom.Polygon');
+goog.require('ol.math');
 goog.require('ol.proj');
 goog.require('ol.style.Fill');
 goog.require('ol.style.Icon');
@@ -54,7 +55,6 @@ ol.format.KMLVec2_;
  *            whens: Array.<number>}}
  */
 ol.format.KMLGxTrackObject_;
-
 
 
 /**
@@ -93,9 +93,23 @@ ol.format.KML = function(opt_options) {
 
   /**
    * @private
+   * @type {boolean}
+   */
+  this.writeStyles_ = options.writeStyles !== undefined ?
+      options.writeStyles : true;
+
+  /**
+   * @private
    * @type {Object.<string, (Array.<ol.style.Style>|string)>}
    */
   this.sharedStyles_ = {};
+
+  /**
+   * @private
+   * @type {boolean}
+   */
+  this.showPointNames_ = options.showPointNames !== undefined ?
+      options.showPointNames : true;
 
 };
 goog.inherits(ol.format.KML, ol.format.XMLFeature);
@@ -205,6 +219,14 @@ ol.format.KML.DEFAULT_IMAGE_STYLE_SRC_ =
 
 /**
  * @const
+ * @type {number}
+ * @private
+ */
+ol.format.KML.DEFAULT_IMAGE_SCALE_MULTIPLIER_ = 0.5;
+
+
+/**
+ * @const
  * @type {ol.style.Image}
  * @private
  */
@@ -215,7 +237,7 @@ ol.format.KML.DEFAULT_IMAGE_STYLE_ = new ol.style.Icon({
   anchorYUnits: ol.format.KML.DEFAULT_IMAGE_STYLE_ANCHOR_Y_UNITS_,
   crossOrigin: 'anonymous',
   rotation: 0,
-  scale: 0.5,
+  scale: ol.format.KML.DEFAULT_IMAGE_SCALE_MULTIPLIER_,
   size: ol.format.KML.DEFAULT_IMAGE_STYLE_SIZE_,
   src: ol.format.KML.DEFAULT_IMAGE_STYLE_SRC_
 });
@@ -234,14 +256,25 @@ ol.format.KML.DEFAULT_STROKE_STYLE_ = new ol.style.Stroke({
 
 /**
  * @const
+ * @type {ol.style.Stroke}
+ * @private
+ */
+ol.format.KML.DEFAULT_TEXT_STROKE_STYLE_ = new ol.style.Stroke({
+  color: [51, 51, 51, 1],
+  width: 2
+});
+
+
+/**
+ * @const
  * @type {ol.style.Text}
  * @private
  */
 ol.format.KML.DEFAULT_TEXT_STYLE_ = new ol.style.Text({
-  font: 'normal 16px Helvetica',
+  font: 'bold 16px Helvetica',
   fill: ol.format.KML.DEFAULT_FILL_STYLE_,
-  stroke: ol.format.KML.DEFAULT_STROKE_STYLE_,
-  scale: 1
+  stroke: ol.format.KML.DEFAULT_TEXT_STROKE_STYLE_,
+  scale: 0.8
 });
 
 
@@ -279,16 +312,62 @@ ol.format.KML.ICON_ANCHOR_UNITS_MAP_ = {
 
 
 /**
+ * @param {ol.style.Style|undefined} foundStyle Style.
+ * @param {string} name Name.
+ * @return {ol.style.Style} style Style.
+ * @private
+ */
+ol.format.KML.createNameStyleFunction_ = function(foundStyle, name) {
+  /** @type {?ol.style.Text} */
+  var textStyle = null;
+  var textOffset = [0, 0];
+  var textAlign = 'start';
+  if (foundStyle.getImage()) {
+    var imageSize = foundStyle.getImage().getImageSize();
+    if (imageSize && imageSize.length == 2) {
+      // Offset the label to be centered to the right of the icon, if there is
+      // one.
+      textOffset[0] = foundStyle.getImage().getScale() * imageSize[0] / 2;
+      textOffset[1] = -foundStyle.getImage().getScale() * imageSize[1] / 2;
+      textAlign = 'left';
+    }
+  }
+  if (!goog.object.isEmpty(foundStyle.getText())) {
+    textStyle = /** @type {ol.style.Text} */
+        (goog.object.clone(foundStyle.getText()));
+    textStyle.setText(name);
+    textStyle.setTextAlign(textAlign);
+    textStyle.setOffsetX(textOffset[0]);
+    textStyle.setOffsetY(textOffset[1]);
+  } else {
+    textStyle = new ol.style.Text({
+      text: name,
+      offsetX: textOffset[0],
+      offsetY: textOffset[1],
+      textAlign: textAlign
+    });
+  }
+  var nameStyle = new ol.style.Style({
+    text: textStyle
+  });
+  return nameStyle;
+};
+
+
+/**
  * @param {Array.<ol.style.Style>|undefined} style Style.
  * @param {string} styleUrl Style URL.
  * @param {Array.<ol.style.Style>} defaultStyle Default style.
- * @param {Object.<string, (Array.<ol.style.Style>|string)>} sharedStyles
- * Shared styles.
+ * @param {Object.<string, (Array.<ol.style.Style>|string)>} sharedStyles Shared
+ *          styles.
+ * @param {boolean|undefined} showPointNames true to show names for point
+ *          placemarks.
  * @return {ol.FeatureStyleFunction} Feature style function.
  * @private
  */
-ol.format.KML.createFeatureStyleFunction_ = function(
-    style, styleUrl, defaultStyle, sharedStyles) {
+ol.format.KML.createFeatureStyleFunction_ = function(style, styleUrl,
+    defaultStyle, sharedStyles, showPointNames) {
+
   return (
       /**
        * @param {number} resolution Resolution.
@@ -296,11 +375,45 @@ ol.format.KML.createFeatureStyleFunction_ = function(
        * @this {ol.Feature}
        */
       function(resolution) {
+        var drawName = showPointNames;
+        /** @type {ol.style.Style|undefined} */
+        var nameStyle;
+        /** @type {string} */
+        var name = '';
+        if (drawName) {
+          if (this.getGeometry()) {
+            drawName = (this.getGeometry().getType() ===
+                        ol.geom.GeometryType.POINT);
+          }
+        }
+
+        if (drawName) {
+          name = /** @type {string} */ (this.getProperties()['name']);
+          drawName = drawName && name;
+        }
+
         if (style) {
+          if (drawName) {
+            nameStyle = ol.format.KML.createNameStyleFunction_(style[0],
+                name);
+            return style.concat(nameStyle);
+          }
           return style;
         }
         if (styleUrl) {
-          return ol.format.KML.findStyle_(styleUrl, defaultStyle, sharedStyles);
+          var foundStyle = ol.format.KML.findStyle_(styleUrl, defaultStyle,
+              sharedStyles);
+          if (drawName) {
+            nameStyle = ol.format.KML.createNameStyleFunction_(foundStyle[0],
+                name);
+            return foundStyle.concat(nameStyle);
+          }
+          return foundStyle;
+        }
+        if (drawName) {
+          nameStyle = ol.format.KML.createNameStyleFunction_(defaultStyle[0],
+              name);
+          return defaultStyle.concat(nameStyle);
         }
         return defaultStyle;
       });
@@ -533,13 +646,16 @@ ol.format.KML.IconStyleParser_ = function(node, objectStack) {
   var heading = /** @type {number} */
       (object['heading']);
   if (heading !== undefined) {
-    rotation = goog.math.toRadians(heading);
+    rotation = ol.math.toRadians(heading);
   }
 
   var scale = /** @type {number|undefined} */
       (object['scale']);
   if (src == ol.format.KML.DEFAULT_IMAGE_STYLE_SRC_) {
     size = ol.format.KML.DEFAULT_IMAGE_STYLE_SIZE_;
+    if (scale === undefined) {
+      scale = ol.format.KML.DEFAULT_IMAGE_SCALE_MULTIPLIER_;
+    }
   }
 
   var imageStyle = new ol.style.Icon({
@@ -1047,8 +1163,8 @@ ol.format.KML.readStyle_ = function(node, objectStack) {
  * Reads an array of geometries and creates arrays for common geometry
  * properties. Then sets them to the multi geometry.
  * @param {ol.geom.MultiPoint|ol.geom.MultiLineString|ol.geom.MultiPolygon}
- * multiGeometry
- * @param {Array.<ol.geom.Geometry>} geometries
+ *     multiGeometry A multi-geometry.
+ * @param {Array.<ol.geom.Geometry>} geometries List of geometries.
  * @private
  */
 ol.format.KML.setCommonGeometryProperties_ = function(multiGeometry,
@@ -1647,8 +1763,8 @@ ol.format.KML.prototype.readDocumentOrFolder_ = function(node, objectStack) {
         'Document': ol.xml.makeArrayExtender(this.readDocumentOrFolder_, this),
         'Folder': ol.xml.makeArrayExtender(this.readDocumentOrFolder_, this),
         'Placemark': ol.xml.makeArrayPusher(this.readPlacemark_, this),
-        'Style': goog.bind(this.readSharedStyle_, this),
-        'StyleMap': goog.bind(this.readSharedStyleMap_, this)
+        'Style': this.readSharedStyle_.bind(this),
+        'StyleMap': this.readSharedStyleMap_.bind(this)
       });
   var features = ol.xml.pushParseAndPop(/** @type {Array.<ol.Feature>} */ ([]),
       parsersNS, node, objectStack, this);
@@ -1694,7 +1810,8 @@ ol.format.KML.prototype.readPlacemark_ = function(node, objectStack) {
     var style = object['Style'];
     var styleUrl = object['styleUrl'];
     var styleFunction = ol.format.KML.createFeatureStyleFunction_(
-        style, styleUrl, this.defaultStyle_, this.sharedStyles_);
+        style, styleUrl, this.defaultStyle_, this.sharedStyles_,
+        this.showPointNames_);
     feature.setStyle(styleFunction);
   }
   delete object['Style'];
@@ -2019,8 +2136,7 @@ ol.format.KML.writeColorTextNode_ = function(node, color) {
  * @param {Array.<*>} objectStack Object stack.
  * @private
  */
-ol.format.KML.writeCoordinatesTextNode_ =
-    function(node, coordinates, objectStack) {
+ol.format.KML.writeCoordinatesTextNode_ = function(node, coordinates, objectStack) {
   var context = objectStack[objectStack.length - 1];
   goog.asserts.assert(goog.isObject(context), 'context should be an Object');
 
@@ -2061,12 +2177,14 @@ ol.format.KML.writeCoordinatesTextNode_ =
  * @param {Node} node Node.
  * @param {Array.<ol.Feature>} features Features.
  * @param {Array.<*>} objectStack Object stack.
+ * @this {ol.format.KML}
  * @private
  */
 ol.format.KML.writeDocument_ = function(node, features, objectStack) {
   var /** @type {ol.xml.NodeStackItem} */ context = {node: node};
   ol.xml.pushSerializeAndPop(context, ol.format.KML.DOCUMENT_SERIALIZERS_,
-      ol.format.KML.DOCUMENT_NODE_FACTORY_, features, objectStack);
+      ol.format.KML.DOCUMENT_NODE_FACTORY_, features, objectStack, undefined,
+      this);
 };
 
 
@@ -2202,8 +2320,7 @@ ol.format.KML.writeLineStyle_ = function(node, style, objectStack) {
  * @param {Array.<*>} objectStack Object stack.
  * @private
  */
-ol.format.KML.writeMultiGeometry_ =
-    function(node, geometry, objectStack) {
+ol.format.KML.writeMultiGeometry_ = function(node, geometry, objectStack) {
   goog.asserts.assert(
       (geometry instanceof ol.geom.MultiPoint) ||
       (geometry instanceof ol.geom.MultiLineString) ||
@@ -2258,6 +2375,7 @@ ol.format.KML.writeBoundaryIs_ = function(node, linearRing, objectStack) {
  * @param {Node} node Node.
  * @param {ol.Feature} feature Feature.
  * @param {Array.<*>} objectStack Object stack.
+ * @this {ol.format.KML}
  * @private
  */
 ol.format.KML.writePlacemark_ = function(node, feature, objectStack) {
@@ -2270,14 +2388,18 @@ ol.format.KML.writePlacemark_ = function(node, feature, objectStack) {
 
   // serialize properties (properties unknown to KML are not serialized)
   var properties = feature.getProperties();
+
   var styleFunction = feature.getStyleFunction();
   if (styleFunction) {
     // FIXME the styles returned by the style function are supposed to be
     // resolution-independent here
     var styles = styleFunction.call(feature, 0);
     if (styles && styles.length > 0) {
-      properties['Style'] = styles[0];
-      var textStyle = styles[0].getText();
+      var style = styles[0];
+      if (this.writeStyles_) {
+        properties['Style'] = styles[0];
+      }
+      var textStyle = style.getText();
       if (textStyle) {
         properties['name'] = textStyle.getText();
       }
@@ -2388,7 +2510,7 @@ ol.format.KML.writeStyle_ = function(node, style, objectStack) {
   var strokeStyle = style.getStroke();
   var imageStyle = style.getImage();
   var textStyle = style.getText();
-  if (imageStyle) {
+  if (imageStyle instanceof ol.style.Icon) {
     properties['IconStyle'] = imageStyle;
   }
   if (textStyle) {
@@ -2480,9 +2602,8 @@ ol.format.KML.ICON_SEQUENCE_ = ol.xml.makeStructureNS(
     ol.format.KML.NAMESPACE_URIS_, [
       'href'
     ],
-    ol.xml.makeStructureNS(
-        ol.format.KML.GX_NAMESPACE_URIS_, [
-          'x', 'y', 'w', 'h'
+    ol.xml.makeStructureNS(ol.format.KML.GX_NAMESPACE_URIS_, [
+      'x', 'y', 'w', 'h'
     ]));
 
 
@@ -2880,6 +3001,7 @@ ol.format.KML.prototype.writeFeaturesNode = function(features, opt_options) {
   var orderedKeys = ol.format.KML.KML_SEQUENCE_[kml.namespaceURI];
   var values = ol.xml.makeSequence(properties, orderedKeys);
   ol.xml.pushSerializeAndPop(context, ol.format.KML.KML_SERIALIZERS_,
-      ol.xml.OBJECT_PROPERTY_NODE_FACTORY, values, [opt_options], orderedKeys);
+      ol.xml.OBJECT_PROPERTY_NODE_FACTORY, values, [opt_options], orderedKeys,
+      this);
   return kml;
 };

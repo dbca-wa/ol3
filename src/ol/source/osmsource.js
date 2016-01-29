@@ -4,7 +4,6 @@ goog.require('ol.Attribution');
 goog.require('ol.source.XYZ');
 
 
-
 /**
  * @classdesc
  * Layer source for the OpenStreetMap tile server.
@@ -36,6 +35,7 @@ ol.source.OSM = function(opt_options) {
     crossOrigin: crossOrigin,
     opaque: true,
     maxZoom: options.maxZoom !== undefined ? options.maxZoom : 19,
+    reprojectionErrorThreshold: options.reprojectionErrorThreshold,
     tileLoadFunction: options.tileLoadFunction,
     url: url,
     wrapX: options.wrapX

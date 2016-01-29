@@ -1,14 +1,12 @@
 goog.provide('ol.control.Zoom');
 
 goog.require('goog.dom');
-goog.require('goog.dom.TagName');
 goog.require('goog.events');
 goog.require('goog.events.EventType');
 goog.require('ol.animation');
 goog.require('ol.control.Control');
 goog.require('ol.css');
 goog.require('ol.easing');
-
 
 
 /**
@@ -38,7 +36,7 @@ ol.control.Zoom = function(opt_options) {
   var zoomOutTipLabel = options.zoomOutTipLabel ?
       options.zoomOutTipLabel : 'Zoom out';
 
-  var inElement = goog.dom.createDom(goog.dom.TagName.BUTTON, {
+  var inElement = goog.dom.createDom('BUTTON', {
     'class': className + '-in',
     'type' : 'button',
     'title': zoomInTipLabel
@@ -48,7 +46,7 @@ ol.control.Zoom = function(opt_options) {
       goog.events.EventType.CLICK, goog.partial(
           ol.control.Zoom.prototype.handleClick_, delta), false, this);
 
-  var outElement = goog.dom.createDom(goog.dom.TagName.BUTTON, {
+  var outElement = goog.dom.createDom('BUTTON', {
     'class': className + '-out',
     'type' : 'button',
     'title': zoomOutTipLabel
@@ -60,7 +58,7 @@ ol.control.Zoom = function(opt_options) {
 
   var cssClasses = className + ' ' + ol.css.CLASS_UNSELECTABLE + ' ' +
       ol.css.CLASS_CONTROL;
-  var element = goog.dom.createDom(goog.dom.TagName.DIV, cssClasses, inElement,
+  var element = goog.dom.createDom('DIV', cssClasses, inElement,
       outElement);
 
   goog.base(this, {
@@ -72,7 +70,7 @@ ol.control.Zoom = function(opt_options) {
    * @type {number}
    * @private
    */
-  this.duration_ = options.duration ? options.duration : 250;
+  this.duration_ = options.duration !== undefined ? options.duration : 250;
 
 };
 goog.inherits(ol.control.Zoom, ol.control.Control);

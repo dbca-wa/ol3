@@ -1,7 +1,6 @@
 goog.provide('ol.control.Rotate');
 
 goog.require('goog.dom');
-goog.require('goog.dom.TagName');
 goog.require('goog.dom.classlist');
 goog.require('goog.events');
 goog.require('goog.events.EventType');
@@ -10,7 +9,6 @@ goog.require('ol.animation');
 goog.require('ol.control.Control');
 goog.require('ol.css');
 goog.require('ol.easing');
-
 
 
 /**
@@ -40,7 +38,7 @@ ol.control.Rotate = function(opt_options) {
   this.label_ = null;
 
   if (goog.isString(label)) {
-    this.label_ = goog.dom.createDom(goog.dom.TagName.SPAN,
+    this.label_ = goog.dom.createDom('SPAN',
         'ol-compass', label);
   } else {
     this.label_ = label;
@@ -49,7 +47,7 @@ ol.control.Rotate = function(opt_options) {
 
   var tipLabel = options.tipLabel ? options.tipLabel : 'Reset rotation';
 
-  var button = goog.dom.createDom(goog.dom.TagName.BUTTON, {
+  var button = goog.dom.createDom('BUTTON', {
     'class': className + '-reset',
     'type' : 'button',
     'title': tipLabel
@@ -60,9 +58,11 @@ ol.control.Rotate = function(opt_options) {
 
   var cssClasses = className + ' ' + ol.css.CLASS_UNSELECTABLE + ' ' +
       ol.css.CLASS_CONTROL;
-  var element = goog.dom.createDom(goog.dom.TagName.DIV, cssClasses, button);
+  var element = goog.dom.createDom('DIV', cssClasses, button);
 
   var render = options.render ? options.render : ol.control.Rotate.render;
+
+  this.callResetNorth_ = options.resetNorth ? options.resetNorth : undefined;
 
   goog.base(this, {
     element: element,
@@ -74,7 +74,7 @@ ol.control.Rotate = function(opt_options) {
    * @type {number}
    * @private
    */
-  this.duration_ = options.duration ? options.duration : 250;
+  this.duration_ = options.duration !== undefined ? options.duration : 250;
 
   /**
    * @type {boolean}
@@ -102,7 +102,11 @@ goog.inherits(ol.control.Rotate, ol.control.Control);
  */
 ol.control.Rotate.prototype.handleClick_ = function(event) {
   event.preventDefault();
-  this.resetNorth_();
+  if (this.callResetNorth_ !== undefined) {
+    this.callResetNorth_();
+  } else {
+    this.resetNorth_();
+  }
 };
 
 
